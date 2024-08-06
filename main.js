@@ -10,11 +10,18 @@ const out = $('output');
 //// CLASSES ////
 
 class CircleField {
-  constructor(
-    n = 1, 
-    ctx = document.querySelector('canvas').getContext('2d')
-  ) {
+  constructor(ctx, n = 1) {
+
+    if (ctx === undefined 
+      || !(ctx instanceof CanvasRenderingContext2D)) {      
+      throw new TypeError('Argument 1: '
+        + 'Expected CanvasRenderingContext2D but received ' 
+        + ctx?.constructor.name ?? 'undefined');
+    }
+
     this.ctx = ctx;
+    this.width = ctx.canvas.width;
+    this.height = ctx.canvas.height;
     this.minRadius = 2;
     this.maxRadius = 
       parseInt(getComputedStyle(ctx.canvas)['font-size']);
@@ -23,14 +30,14 @@ class CircleField {
 
   init(n) {
     this.canvasDiagonal = Math.hypot(
-      this.ctx.canvas.width,
-      this.ctx.canvas.height,
+      this.width,
+      this.height,
     );
     return Array.from({length: n}, () => {
       const r = rnd(this.minRadius, this.maxRadius);
       return new Circle( 
-        rnd(r, canvas.width - r),
-        rnd(r, canvas.height - r),
+        rnd(r, this.width - r),
+        rnd(r, this.height - r),
         r
       )
     });
@@ -43,9 +50,15 @@ class CircleField {
         relativeMouseX - circle.x, 
         relativeMouseY - circle.y
       );
-      const color = this.colorSpaceFunctions['lab'] (
-        d, circle, animateLightness
-      );
+      const params = {
+        d: d, 
+        circle: circle, 
+        animateLightness: animateLightness,
+        width: this.width,
+        height: this.height,
+        canvasDiagonal: this.canvasDiagonal
+      }
+      const color = this.colorSpaceFunctions['lab'](params);
       circle.draw(color);
       // console.log(color);
     }  
@@ -53,22 +66,31 @@ class CircleField {
 
   colorSpaceFunctions = {
 
-    "lab": (d, circle, animateLightness) => {
-      // default lightness value
+    "lab": (params) => {
+      // l: lightness, a: red/green axis, b: blue/yellow axis
       let l = 0; 
-      if (animateLightness) {
-        l = lerp(0, 100, easeInExpo(1 - d / this.canvasDiagonal));
+      if (params.animateLightness) {
+        l = lerp(
+          0, 100, easeInExpo(1 - params.d / params.canvasDiagonal)
+        );
       }
-      const a = lerp(-150, 150, circle.x / canvas.width);
-      const b = lerp(-150, 150, circle.y / canvas.height);
-      return `lab(${l} ${a} ${b})`;    },
-
-    "hsl": () => {
+      const a = lerp(-150, 150, params.circle.x / params.width);
+      const b = lerp(-150, 150, params.circle.y / params.height);
+      return `lab(${l} ${a} ${b})`;    
     },
 
+    "hsl": () => {
+      return 'gray';
+    },
+    
     "hwb": () => {
+      return 'gray';
     }
   };
+
+  getColorSpaceFunctionNames() {
+    return Object.keys(this.colorSpaceFunctions);
+  }
   
 }
 
@@ -134,27 +156,26 @@ stopBtn.addEventListener('click', () => {
 
 
 refreshBrn.addEventListener('click', () => {
-  circles = new CircleField(numCircles);
-})
-
-
-canvas.addEventListener('click', () => {
+  circles = new CircleField(ctx, numCircles);
 })
 
 
 function populateColorSpaceMenu() {
-  // for (f of Object.keys(colorSpaceFunctions)) {
-
-  // }
+  for (f of circles.getColorSpaceFunctionNames()) {
+    const opt = document.createElement('option');
+    opt.setAttribute('value', f);
+    opt.innerText = f;
+    colorSpaceMenu.append(opt);
+  }
 }
 
 //// MAIN LOOP ////
 
-populateColorSpaceMenu();
 
 const numCircles = 64;
-let circles = new CircleField(numCircles);
+let circles = new CircleField(ctx, numCircles);
 let animateLightness = true;
+populateColorSpaceMenu();
 
 draw();
 function draw() {
