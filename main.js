@@ -26,7 +26,7 @@ class CircleField {
     this.height = ctx.canvas.height;
     this.minRadius = 2;
     this.maxRadius = 
-      parseInt(getComputedStyle(ctx.canvas)['font-size']);
+      parseInt(getComputedStyle(ctx.canvas)['font-size']) * 1.2;
     this.circles = this.init(n);
   }
 
@@ -45,8 +45,7 @@ class CircleField {
     });
   }
 
-  draw(animateLightness = false) {
-    let s = '';
+  draw(mouseOver = false) {
     for (let circle of this.circles) {
       // distance from mouse pointer to circle
       const d = Math.hypot(
@@ -54,57 +53,68 @@ class CircleField {
         canvasY - circle.y
       );
       const params = {
-        d, circle, animateLightness,
+        d, circle, mouseOver,
         width: this.width,
         height: this.height,
         canvasDiagonal: this.canvasDiagonal
       }
       const color = this.colorSpaceFunctions[colorSpaceFunction](params);
       circle.draw(color);
-      s += color + '\n';
     }  
-    // pre.innerText = s;
   }
   
 
   colorSpaceFunctions = {
+    // l: brightness, c: chroma or amount of color, h: hue
+    // 0-100, 0-230 (100% ~= 150), 0-360
+    "lch": (params) => {
+      // Gets a vector to circle relative to mouse pointer
+      const x = params.circle.x - canvasX;
+      const y = params.circle.y - canvasY;
+      
+      const l = lerp(30, 85, (params.circle.r - this.minRadius) / (this.maxRadius - this.minRadius));
+      const c = lerp(50, 75, (params.circle.r - this.minRadius) / (this.maxRadius - this.minRadius));
+      const h = this.calculateTheta({x, y}) / (Math.PI * 2) * 360;
+
+      return `lch(${l} ${c}% ${h})`;
+    },
+
+    // h: hue, s: saturation, l: lightness
+    // 0-360, 0-100, 0-100 (0=black, 50=saturation, 100=white)
     "hsl": (params) => {
-      const x = params.circle.x - (params.width / 2);
-      const y = params.circle.y - (params.height / 2);
+      // Effectively gets a vector to a circle,
+      // relative to the center of the canvas
+      const x = params.circle.x - (this.width / 2);
+      const y = params.circle.y - (this.height / 2);
 
       const h = this.calculateTheta({x, y}) / (2 * Math.PI) * 360;
-
-      const r = Math.hypot(x, y) / (params.width / 2);
-      let l = 25;
-
+      let l = 20;
       let s = 0; 
-      if (params.animateLightness) {
+
+      if (params.mouseOver) {
         l = lerp(
-          25, 75, easeInQuart(1 - params.d / params.canvasDiagonal)
+          20, 70, easeInQuart(1 - params.d / this.canvasDiagonal)
         );
         s = lerp(
-          0, 100, easeInQuart(1 - params.d / params.canvasDiagonal)
+          0, 100, easeInQuart(1 - params.d / this.canvasDiagonal)
         );
       } 
       return `hsl(${h} ${s} ${l})`;
-    },
+    },    
     
+    // l: lightness, a: red/green axis, b: blue/yellow axis
+    // 0 - 100, -150 - 150, -150 - 150
     "lab": (params) => {
-      // l: lightness, a: red/green axis, b: blue/yellow axis
       let l = 0; 
-      if (params.animateLightness) {
+      if (params.mouseOver) {
         l = lerp(
-          0, 100, easeInExpo(1 - params.d / params.canvasDiagonal)
+          0, 100, easeInExpo(1 - params.d / this.canvasDiagonal)
         );
       }
-      const a = lerp(-150, 150, params.circle.x / params.width);
-      const b = lerp(-150, 150, params.circle.y / params.height);
-      return `lab(${l} ${a} ${b})`;    
+      const a = lerp(-150, 150, params.circle.x / this.width);
+      const b = lerp(-150, 150, params.circle.y / this.height);
+      return `lab(${l} ${a} ${b})`;
     },
-    
-    "lch": () => {
-      return 'gray';
-    }
   };
 
 
@@ -157,17 +167,17 @@ let canvasY = 0;
 canvas.addEventListener('mousemove', e => {
   canvasX = e.offsetX;
   canvasY = e.offsetY;
-  animateLightness = true;
+  mouseOver = true;
 });
 
 
 canvas.addEventListener('mouseout', () => {
-  animateLightness = false;
+  mouseOver = false;
 });
 
 
 canvas.addEventListener('mouseenter', () => {
-  animateLightness = true;
+  mouseOver = true;
 });
 
 
@@ -211,14 +221,14 @@ function populateColorSpaceMenu() {
 
 const numCircles = 72;
 let circleField = new CircleField(ctx, numCircles);
-let animateLightness = false;
+let mouseOver = false;
 populateColorSpaceMenu();
 
 draw();
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   out.innerText = `(${canvasX}, ${canvasY})`;
-  circleField.draw(animateLightness);
+  circleField.draw(mouseOver);
   
   if (!stopped) {
     requestAnimationFrame(draw);
