@@ -6,6 +6,8 @@ const colorSpaceMenu = $('#color-space-menu');
 const stopBtn = $('#btn');
 const refreshBrn = $('#refresh');
 const out = $('output');
+const pre = $('pre');
+let colorSpaceFunction;
 
 //// CLASSES ////
 
@@ -13,10 +15,10 @@ class CircleField {
   constructor(ctx, n = 1) {
 
     if (ctx === undefined 
-      || !(ctx instanceof CanvasRenderingContext2D)) {      
-      throw new TypeError('Argument 1: '
-        + 'Expected CanvasRenderingContext2D but received ' 
-        + ctx?.constructor.name ?? 'undefined');
+      || !(ctx instanceof CanvasRenderingContext2D)) {
+      throw new TypeError('Argument 1: ' + 
+        'Expected CanvasRenderingContext2D but received ' + 
+        ctx?.constructor.name ?? 'undefined');
     }
 
     this.ctx = ctx;
@@ -44,28 +46,49 @@ class CircleField {
   }
 
   draw(animateLightness = false) {
+    let s = '';
     for (let circle of this.circles) {
       // distance from mouse pointer to circle
       const d = Math.hypot(
-        relativeMouseX - circle.x, 
-        relativeMouseY - circle.y
+        canvasX - circle.x, 
+        canvasY - circle.y
       );
       const params = {
-        d: d, 
-        circle: circle, 
-        animateLightness: animateLightness,
+        d, circle, animateLightness,
         width: this.width,
         height: this.height,
         canvasDiagonal: this.canvasDiagonal
       }
-      const color = this.colorSpaceFunctions['lab'](params);
+      const color = this.colorSpaceFunctions[colorSpaceFunction](params);
       circle.draw(color);
-      // console.log(color);
+      s += color + '\n';
     }  
+    // pre.innerText = s;
   }
+  
 
   colorSpaceFunctions = {
+    "hsl": (params) => {
+      const x = params.circle.x - (params.width / 2);
+      const y = params.circle.y - (params.height / 2);
 
+      const h = this.calculateTheta({x, y}) / (2 * Math.PI) * 360;
+
+      const r = Math.hypot(x, y) / (params.width / 2);
+      let l = 25;
+
+      let s = 0; 
+      if (params.animateLightness) {
+        l = lerp(
+          25, 75, easeInQuart(1 - params.d / params.canvasDiagonal)
+        );
+        s = lerp(
+          0, 100, easeInQuart(1 - params.d / params.canvasDiagonal)
+        );
+      } 
+      return `hsl(${h} ${s} ${l})`;
+    },
+    
     "lab": (params) => {
       // l: lightness, a: red/green axis, b: blue/yellow axis
       let l = 0; 
@@ -78,15 +101,30 @@ class CircleField {
       const b = lerp(-150, 150, params.circle.y / params.height);
       return `lab(${l} ${a} ${b})`;    
     },
-
-    "hsl": () => {
-      return 'gray';
-    },
     
-    "hwb": () => {
+    "lch": () => {
       return 'gray';
     }
   };
+
+
+  calculateTheta(p) {
+    let theta = Math.atan(p.y / p.x);
+
+    // Converts the result of sign (-1, 0, 1) to 
+    // (0, 1, 2) for use as index into multiplier array
+    const x = Math.sign(p.x) + 1;
+    const y = Math.sign(p.y) + 1;
+    
+    // Adds a multiple of PI based on the quadrant of the point
+    // to give an angle in the range [0, 2 * PI)
+    const multiplier = [
+      [1, 2, 2],
+      [1, 0, 0],
+      [1, 0, 0]
+    ];
+    return theta + multiplier[y][x] * Math.PI;
+  }
 
   getColorSpaceFunctionNames() {
     return Object.keys(this.colorSpaceFunctions);
@@ -103,8 +141,8 @@ class Circle {
   }
 
   draw(color = 'gray', r = this.r) {
-    ctx.beginPath();
     ctx.fillStyle = color;
+    ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
     ctx.fill();
     ctx.closePath();
@@ -113,20 +151,13 @@ class Circle {
 
 //// EVENT LISTENERS ////
 
-let relativeMouseX = 0;
-let relativeMouseY = 0;
+let canvasX = 0;
+let canvasY = 0;
 
 canvas.addEventListener('mousemove', e => {
-  relativeMouseX = constrain(
-    e.clientX - canvas.offsetLeft, 
-    0, 
-    canvas.width
-  )
-  relativeMouseY = constrain(
-    e.clientY - canvas.offsetTop, 
-    0, 
-    canvas.height
-  )
+  canvasX = e.offsetX;
+  canvasY = e.offsetY;
+  animateLightness = true;
 });
 
 
@@ -156,32 +187,38 @@ stopBtn.addEventListener('click', () => {
 
 
 refreshBrn.addEventListener('click', () => {
-  circles = new CircleField(ctx, numCircles);
+  circleField = new CircleField(ctx, numCircles);
+})
+
+
+colorSpaceMenu.addEventListener('change', e => {
+  colorSpaceFunction = e.target.value;
 })
 
 
 function populateColorSpaceMenu() {
-  for (f of circles.getColorSpaceFunctionNames()) {
+  for (f of circleField.getColorSpaceFunctionNames()) {
     const opt = document.createElement('option');
     opt.setAttribute('value', f);
     opt.innerText = f;
     colorSpaceMenu.append(opt);
   }
+  colorSpaceFunction = colorSpaceMenu.value;
 }
 
 //// MAIN LOOP ////
 
 
-const numCircles = 64;
-let circles = new CircleField(ctx, numCircles);
-let animateLightness = true;
+const numCircles = 72;
+let circleField = new CircleField(ctx, numCircles);
+let animateLightness = false;
 populateColorSpaceMenu();
 
 draw();
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  out.innerText = `(${relativeMouseX}, ${relativeMouseY})`;
-  circles.draw(animateLightness);
+  out.innerText = `(${canvasX}, ${canvasY})`;
+  circleField.draw(animateLightness);
   
   if (!stopped) {
     requestAnimationFrame(draw);

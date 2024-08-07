@@ -34,6 +34,10 @@ function easeInQuad(x) {
   return x * x;
 }
 
+function easeInQuart(x) {
+  return x*x*x*x;
+}
+
 function easeInExpo(x) {
   return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
 }
