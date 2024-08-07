@@ -3,36 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      background-color: black;
-    }
-    canvas {
-      background-color: #111;
-      border: 1px dotted gray;
-      display: block;
-      margin: 1em auto;
-    }
-    output {
-      color: gray;
-      /* border: 1px solid gray; */
-      height: 1em;
-      font-family: monospace;
-    }
-    #controls {
-      width: 360px;
-      margin: 1em auto;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
   <script src="utils.js" type="text/javascript"></script>
   <title>Color Space Functions Demo</title>
 </head>
 <body>
-  <canvas id="canvas" width="360" height="280"></canvas>
+  <canvas id="canvas" width="600" height="600"></canvas>
   <div id="controls">
-    <select id="color-space-menu"></select>
-    <button id="btn">Stop</button>
-    <button id="refresh">Refresh</button>
+    <select id="color-space-menu" class="control"></select>
+    <button id="btn" class="control">Stop</button>
+    <button id="refresh" class="control">Refresh</button>
     <output></output>
   </div>
   <script src="main.js"></script>
